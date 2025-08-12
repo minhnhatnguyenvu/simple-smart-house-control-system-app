@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Smart Home Manager</title>
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #0f1724; color: white; margin: 0; padding: 20px; }
+    .app { max-width: 900px; margin: auto; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; }
+    header { display: flex; justify-content: space-between; align-items: center; }
+    h1 { margin: 0; }
+    input { padding: 5px; border-radius: 5px; border: none; }
+    .time { font-weight: bold; }
+    .panel { margin-top: 20px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 8px; }
+    .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .card { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; }
+    .dot { width: 14px; height: 14px; border-radius: 50%; background: gray; }
+    .dot.open { background: green; }
+    .dot.warn { background: red; }
+    button { padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer; }
+    .primary { background: blue; color: white; }
+    .small { font-size: 0.9em; }
+    .dot.open{background:var(--accent);box-shadow:0 0 8px rgba(34,197,94,0.25)}
+    .dot.warn{background:var(--danger);box-shadow:0 0 10px rgba(239,68,68,0.25)}
+    .actions{display:flex;flex-direction:column;gap:8px}
+    button{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:inherit;cursor:pointer}
+    .primary{background:linear-gradient(90deg,#1e90ff,#4f46e5);border:none;color:white}
+    .small{padding:6px 8px;font-size:14px}
+    .log{max-height:200px;overflow:auto;margin-top:10px;padding:10px;background:rgba(255,255,255,0.01);border-radius:8px;border:1px dashed rgba(255,255,255,0.02);font-size:13px;color:var(--muted)}
+    footer{margin-top:12px;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px}
+    @media (max-width:780px){main{grid-template-columns:1fr;}
+      .status-grid{grid-template-columns:1fr}
+      input#houseName{min-width:140px}
+    }
+  </style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="Smart Home Manager">
+    <header>
+      <div class="title-block">
+        <h1>Quản lý căn nhà thông minh</h1>
+        <input id="houseName" aria-label="Tên nhà" placeholder="Nhập tên nhà (ví dụ: Nhà Nhật)" />
+      </div>
+      <div class="time" id="clock">--:--:--</div>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h3>Trạng thái hiện tại</h3>
+        <div class="status-grid" style="margin-top:12px">
+          <div class="card" id="card-door">
+            <div class="left">
+              <div class="dot" id="dot-door" aria-hidden="true"></div>
+              <div>
+                <div style="font-weight:600">Cửa trước</div>
+                <div id="door-desc" style="color:var(--muted);font-size:13px">Đóng</div>
+              </div>
+            </div>
+            <div class="actions">
+              <button id="toggle-door" class="small">Mở/Đóng</button>
+            </div>
+          </div>
+
+          <div class="card" id="card-package">
+            <div class="left">
+              <div class="dot" id="dot-package" aria-hidden="true"></div>
+              <div>
+                <div style="font-weight:600">Gói hàng</div>
+                <div id="package-desc" style="color:var(--muted);font-size:13px">Không có</div>
+              </div>
+            </div>
+            <div class="actions">
+              <button id="simulate-package" class="small">Mô phỏng giao</button>
+            </div>
+          </div>
+
+          <div class="card" id="card-unknown">
+            <div class="left">
+              <div class="dot" id="dot-unknown" aria-hidden="true"></div>
+              <div>
+                <div style="font-weight:600">Vật thể lạ</div>
+                <div id="unknown-desc" style="color:var(--muted);font-size:13px">Không phát hiện</div>
+              </div>
+            </div>
+            <div class="actions">
+              <button id="simulate-unknown" class="small">Mô phỏng phát hiện</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="font-weight:600">Hành động nhanh</div>
+            <div class="actions">
+              <button id="ack-package" class="small">Xác nhận nhận gói</button>
+              <button id="clear-unknown" class="small">Xóa cảnh báo</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="log" id="log" aria-live="polite"></div>
+      </section>
+
+      <aside class="panel">
+        <h3>Điều khiển & Lưu</h3>
+        <p style="color:var(--muted);font-size:14px">Bạn có thể đổi tên nhà. Trạng thái được lưu cục bộ trên trình duyệt.</p>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button id="save" class="primary small">Lưu</button>
+          <button id="reset" class="small">Đặt lại</button>
+          <button id="export" class="small">Xuất trạng thái</button>
+        </div>
+
+        <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.02)" />
+        <h4>Phím tắt mô phỏng</h4>
+        <p style="color:var(--muted);font-size:13px;margin-top:6px">Sử dụng các nút dưới đây để mô phỏng sự kiện (hữu ích khi test)</p>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-direction:column">
+          <button id="sim-door-open" class="small">Mở cửa</button>
+          <button id="sim-door-close" class="small">Đóng cửa</button>
+          <button id="sim-package-clear" class="small">Xóa gói</button>
+        </div>
+      </aside>
+    </main>
+
+    <footer>
+      <div>Phiên bản demo • Không cần server</div>
+      <div id="saved-indicator" style="color:var(--muted)"></div>
+    </footer>
+  </div>
+
+  <script>
+    // State management with localStorage
+    const LS_KEY = 'smartHomeState_v1';
+    const defaultState = {
+      houseName: '',
+      doorOpen: false,
+      packagePresent: false,
+      unknownDetected: false,
+      logs: []
+    };
+
+    let state = loadState();
+
+    // Elements
+    const houseNameInput = document.getElementById('houseName');
+    const clockEl = document.getElementById('clock');
+    const dotDoor = document.getElementById('dot-door');
+    const doorDesc = document.getElementById('door-desc');
+    const toggleDoorBtn = document.getElementById('toggle-door');
+    const dotPackage = document.getElementById('dot-package');
+    const packageDesc = document.getElementById('package-desc');
+    const simulatePackageBtn = document.getElementById('simulate-package');
+    const ackPackageBtn = document.getElementById('ack-package');
+    const dotUnknown = document.getElementById('dot-unknown');
+    const unknownDesc = document.getElementById('unknown-desc');
+    const simulateUnknownBtn = document.getElementById('simulate-unknown');
+    const clearUnknownBtn = document.getElementById('clear-unknown');
+    const logEl = document.getElementById('log');
+    const saveBtn = document.getElementById('save');
+    const resetBtn = document.getElementById('reset');
+    const exportBtn = document.getElementById('export');
+    const simDoorOpen = document.getElementById('sim-door-open');
+    const simDoorClose = document.getElementById('sim-door-close');
+    const simPackageClear = document.getElementById('sim-package-clear');
+    const savedIndicator = document.getElementById('saved-indicator');
+
+    // Initialize UI with state
+    function loadState(){
+      try{
+        const raw = localStorage.getItem(LS_KEY);
+        if(!raw) return {...defaultState};
+        const parsed = JSON.parse(raw);
+        return {...defaultState, ...parsed};
+      }catch(e){
+        console.error('load error', e);
+        return {...defaultState};
+      }
+    }
+
+    function saveState(){
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+      showSavedIndicator();
+    }
+
+    function showSavedIndicator(){
+      savedIndicator.textContent = 'Đã lưu cục bộ';
+      setTimeout(()=>{ savedIndicator.textContent = '' }, 1500);
+    }
+
+    function addLog(text){
+      const t = new Date().toLocaleString();
+      state.logs.unshift({t,text});
+      if(state.logs.length>200) state.logs.pop();
+      renderLogs();
+      saveState();
+    }
+
+    function renderLogs(){
+      logEl.innerHTML = state.logs.map(l=>`<div><strong style="color:var(--muted)">${l.t}</strong> — ${escapeHtml(l.text)}</div>`).join('');
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    }
+
+    function render(){
+      houseNameInput.value = state.houseName || '';
+      // Door
+      if(state.doorOpen){
+        dotDoor.classList.add('open');
+        doorDesc.textContent = 'Mở';
+      } else {
+        dotDoor.classList.remove('open');
+        doorDesc.textContent = 'Đóng';
+      }
+      // Package
+      if(state.packagePresent){
+        dotPackage.classList.add('open');
+        packageDesc.textContent = 'Có gói hàng';
+      } else {
+        dotPackage.classList.remove('open');
+        packageDesc.textContent = 'Không có';
+      }
+      // Unknown
+      if(state.unknownDetected){
+        dotUnknown.classList.add('warn');
+        unknownDesc.textContent = 'Phát hiện vật thể lạ';
+      } else {
+        dotUnknown.classList.remove('warn');
+        unknownDesc.textContent = 'Không phát hiện';
+      }
+
+      renderLogs();
+    }
+
+    // Clock
+    function updateClock(){
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2,'0');
+      const mm = String(now.getMinutes()).padStart(2,'0');
+      const ss = String(now.getSeconds()).padStart(2,'0');
+      clockEl.textContent = `${hh}:${mm}:${ss}`;
+    }
+    setInterval(updateClock,1000);
+    updateClock();
+
+    // Handlers
+    houseNameInput.addEventListener('input',e=>{
+      state.houseName = e.target.value;
+    });
+
+    toggleDoorBtn.addEventListener('click', ()=>{
+      state.doorOpen = !state.doorOpen;
+      addLog(state.doorOpen ? 'Cửa trước đã được mở.' : 'Cửa trước đã được đóng.');
+      render();
+    });
+
+    simulatePackageBtn.addEventListener('click', ()=>{
+      state.packagePresent = true;
+      addLog('Giao hàng: Có gói hàng được để trước cửa.');
+      render();
+    });
+
+    ackPackageBtn.addEventListener('click', ()=>{
+      if(state.packagePresent){
+        state.packagePresent = false;
+        addLog('Người dùng đã xác nhận nhận gói.');
+        render();
+      } else {
+        addLog('Không có gói để xác nhận.');
+      }
+    });
+
+    simulateUnknownBtn.addEventListener('click', ()=>{
+      state.unknownDetected = true;
+      addLog('Cảnh báo: Vật thể lạ phát hiện trước cửa.');
+      render();
+    });
+
+    clearUnknownBtn.addEventListener('click', ()=>{
+      if(state.unknownDetected){
+        state.unknownDetected = false;
+        addLog('Cảnh báo vật thể lạ đã được xóa.');
+        render();
+      } else addLog('Không có cảnh báo vật thể lạ.');
+    });
+
+    saveBtn.addEventListener('click', ()=>{
+      saveState();
+    });
+
+    resetBtn.addEventListener('click', ()=>{
+      if(confirm('Bạn có chắc muốn đặt lại trạng thái về mặc định?')){
+        state = {...defaultState};
+        saveState();
+        render();
+        addLog('Đã đặt lại trạng thái về mặc định.');
+      }
+    });
+
+    exportBtn.addEventListener('click', ()=>{
+      const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = (state.houseName||'smart-home-state') + '.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      addLog('Xuất trạng thái ra file JSON.');
+    });
+
+    // Shortcut simulation buttons
+    simDoorOpen.addEventListener('click', ()=>{ if(!state.doorOpen){ state.doorOpen=true; addLog('Mô phỏng: cửa mở'); render(); } });
+    simDoorClose.addEventListener('click', ()=>{ if(state.doorOpen){ state.doorOpen=false; addLog('Mô phỏng: cửa đóng'); render(); } });
+    simPackageClear.addEventListener('click', ()=>{ if(state.packagePresent){ state.packagePresent=false; addLog('Mô phỏng: gói hàng được dọn'); render(); } });
+
+    // Before unload, auto-save
+    window.addEventListener('beforeunload', ()=>{ localStorage.setItem(LS_KEY, JSON.stringify(state)); });
+
+    // Initial render
+    render();
+
+    // If first time, add welcome log
+    if(!state.logs || state.logs.length===0){ addLog('Ứng dụng sẵn sàng. Chạm "Lưu" để lưu cấu hình.'); }
+  </script>
+</body>
+</html>
